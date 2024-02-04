@@ -1,10 +1,12 @@
 package main
 
 import (
-	"fmt"
+	"github.com/AlexanderVasiliev23/go-grpc-auth/internal/app"
 	"github.com/AlexanderVasiliev23/go-grpc-auth/internal/config"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
 const (
@@ -14,10 +16,20 @@ const (
 
 func main() {
 	cfg := config.MustLoad()
-	logger := setupLogger(cfg.Env)
 
-	logger.Error("as")
-	fmt.Printf("%+v", cfg)
+	log := setupLogger(cfg.Env)
+	log.Info("starting application", slog.Any("config", cfg))
+
+	application := app.NewApp(log, cfg.Grpc.Port, cfg.StoragePath, cfg.TokenTTL)
+
+	go application.GRPCServer.MustRun()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGTERM, syscall.SIGINT)
+
+	<-stop
+
+	application.GRPCServer.Stop()
 }
 
 func setupLogger(env string) *slog.Logger {
